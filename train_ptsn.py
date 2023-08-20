@@ -1,6 +1,7 @@
+import torch
 import random
 from data import TextField, RawField, ImageField
-from data import COCO, DataLoader
+from data import COCO, DataLoader, MIMIC_CXR
 from torch.utils.data import DistributedSampler
 import evaluation
 from evaluation import PTBTokenizer, Cider
@@ -10,7 +11,6 @@ from models.transformer.encoder_entry import build_encoder
 from models.transformer.optimi_entry  import build_optimizer
 from models.transformer.conceptencoders import PAEncoder
 
-import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import LambdaLR
 from torch.nn import NLLLoss
@@ -29,7 +29,7 @@ import warnings
 
 warnings.filterwarnings('ignore')
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "4, 5, 6, 7"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
 def evaluate_loss(model, dataloader, loss_fn, text_field, e, device):
 
@@ -67,7 +67,7 @@ def evaluate_metrics(model, dataloader, text_field, e, device):
         for it, (images, caps_gt) in enumerate(iter(dataloader)):
             images = images.to(device)
             with torch.no_grad():
-                out, _ = model(mode='rl', images=images, max_len=20, eos_idx=text_field.vocab.stoi['<eos>'], beam_size=5, out_size=1)
+                out, _ = model(mode='rl', images=images, max_len=100, eos_idx=text_field.vocab.stoi['<eos>'], beam_size=3, out_size=1)
             caps_gen = text_field.decode(out, join_words=False)
             for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
                 gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
@@ -129,8 +129,8 @@ def train_scst(model, dataloader, optim_rl, cider, text_field, scheduler_rl, e, 
         print('lr = ', optim_rl.state_dict()['param_groups'][0]['lr'])
 
     running_loss = .0
-    seq_len = 20
-    beam_size = 5
+    seq_len = 100
+    beam_size = 3
 
     with tqdm(desc='Epoch %d - train' % e, unit='it', total=len(dataloader), disable=device!=0) as pbar:
         for it, (detections, caps_gt) in enumerate(dataloader):
@@ -186,18 +186,21 @@ def _generalConfig(rank: int, worldSize: int):
 
 def train(rank, worldSize, args):
     _generalConfig(rank, worldSize)
-
+    max_len = 100
     print('Rank{}: Transformer Training'.format(rank))
     if rank == 0:
         writer = SummaryWriter(log_dir=os.path.join(args.logs_folder, args.exp_name))
     # Pipeline for image regions
     image_field = ImageField(config=args)
     # Pipeline for text
-    text_field = TextField(init_token='<bos>', eos_token='<eos>', lower=True, tokenize='spacy', remove_punctuation=True, nopoints=False)
+    #text_field = TextField(init_token='<bos>', eos_token='<eos>', lower=True, tokenize='spacy', remove_punctuation=True,
+    #                       nopoints=False)
+    text_field = TextField(init_token='<bos>', eos_token='<eos>', lower=True, tokenize='spacy', remove_punctuation=True, nopoints=False, fix_length=max_len)
 
 
     # Create the dataset
-    dataset = COCO(image_field, text_field, 'coco/images/', args.annotation_folder, args.annotation_folder)
+    #dataset = COCO(image_field, text_field, 'coco/images/', args.annotation_folder, args.annotation_folder)
+    dataset = MIMIC_CXR(image_field, text_field, args.img_root_path, args.annotation_folder, args.annotation_folder)
     train_dataset, val_dataset, test_dataset = dataset.splits
 
     if not os.path.isfile('vocab.pkl'):
@@ -211,11 +214,11 @@ def train(rank, worldSize, args):
     # DDP Model and dataloaders
     backbone = build_encoder(args)
     encoder = PAEncoder(d_in=args.d_in, d_model=512)
-    decoder = TransformerDecoderLayer(len(text_field.vocab), 54, 3, text_field.vocab.stoi['<pad>'], d_model=512)
+    decoder = TransformerDecoderLayer(len(text_field.vocab), max_len, 3, text_field.vocab.stoi['<pad>'], d_model=512)
     torch.cuda.set_device(rank)
     model = Transformer(text_field.vocab.stoi['<bos>'], backbone, decoder, encoder)
-    model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-    model = torch.nn.parallel.DistributedDataParallel(model.to(rank), device_ids=[rank], output_device=rank, broadcast_buffers=False, find_unused_parameters=True)
+    model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(rank)
+    #model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[rank], output_device=rank, broadcast_buffers=False, find_unused_parameters=True)
 
 
     dict_dataset_train = train_dataset.image_dictionary({'image': image_field, 'text': RawField()})
@@ -313,7 +316,7 @@ def train(rank, worldSize, args):
             print('patience:', data['patience'])
 
     print("Rank{}: Training starts".format(rank))
-    for e in range(start_epoch, start_epoch + 100):
+    for e in range(start_epoch, start_epoch + args.epoch):
         trainSampler = DistributedSampler(train_dataset, worldSize, rank)
         trainSampler.set_epoch(e)
         dataloader_train = DataLoader(train_dataset, sampler=trainSampler, batch_size=args.batch_size, pin_memory=True, drop_last=False, num_workers=args.workers, persistent_workers=True)
@@ -468,6 +471,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Progressive Tree-Structured prototype Network')
     parser.add_argument('--exp_name', type=str, default='swintransformer_base_texthiproto2000-800')
     parser.add_argument('--batch_size', type=int, default=50)
+    parser.add_argument('--epoch', type=int, default=100)
     parser.add_argument('--workers', type=int, default=4)
     parser.add_argument('--m', type=int, default=40)
     parser.add_argument('--head', type=int, default=8)
@@ -508,4 +512,5 @@ if __name__ == '__main__':
     worldSize = args.num_gpus
     _changeConfig(args, worldSize)
     print('\nDistribute config', args)
+    #train(0,1, args)
     mp.spawn(train, (worldSize, args), worldSize)

@@ -31,7 +31,7 @@ def reporthook(t):
 
 import revtok
 import spacy
-spacy_en = spacy.load('en')
+spacy_en = spacy.load('en_core_web_sm')
 
 
 def _getTokenizerrevtok(x):

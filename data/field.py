@@ -12,7 +12,7 @@ import shutil
 from PIL import Image
 from timm.data import create_transform
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
-from timm.data.transforms import _pil_interp
+from timm.data.transforms import str_to_pil_interp
 from torchvision import transforms
 
 from .dataset import Dataset
@@ -154,14 +154,14 @@ def build_transform(is_train, config):
         if config.TESTCROP:
             size = int((256 / 224) * config.IMG_SIZE)
             t.append(
-                transforms.Resize(size, interpolation=_pil_interp(config.INTERPOLATION)),
+                transforms.Resize(size, interpolation=str_to_pil_interp(config.INTERPOLATION)),
                 # to maintain same ratio w.r.t. 224 images
             )
             t.append(transforms.CenterCrop(config.IMG_SIZE))
         else:
             t.append(
                 transforms.Resize((config.IMG_SIZE, config.IMG_SIZE),
-                                  interpolation=_pil_interp(config.INTERPOLATION))
+                                  interpolation=str_to_pil_interp(config.INTERPOLATION))
             )
 
     t.append(transforms.ToTensor())
@@ -240,7 +240,7 @@ class TextField(RawField):
 
         super(TextField, self).__init__(preprocessing, postprocessing)
 
-    def preprocess(self, x, is_train):
+    def preprocess(self, x, is_train=False):
         if six.PY2 and isinstance(x, six.string_types) and not isinstance(x, six.text_type):
             x = six.text_type(x, encoding='utf-8')
         if self.lower:
@@ -263,10 +263,9 @@ class TextField(RawField):
         sources = []
         for arg in args:
             if isinstance(arg, Dataset):
-                sources += [getattr(arg, name) for name, field in arg.fields.items() if field is self]
+                sources += [getattr(arg, name)() for name, field in arg.fields.items() if field is self]
             else:
                 sources.append(arg)
-
         for data in sources:
             for x in data:
                 x = self.preprocess(x)

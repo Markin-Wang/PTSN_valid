@@ -6,7 +6,7 @@ import torch
 from .example import Example
 from .utils import nostdout
 from pycocotools.coco import COCO as pyCOCO
-
+import json
 
 class Dataset(object):
     def __init__(self, examples, fields, is_train=False):
@@ -277,7 +277,6 @@ class COCO(PairedDataset):
                 caption = coco.anns[ann_id]['caption']
                 img_id = coco.anns[ann_id]['image_id']
                 filename = coco.loadImgs(img_id)[0]['file_name']
-
                 example = Example.fromdict({'image': os.path.join(img_root, filename), 'text': caption})
 
                 if split == 'train':
@@ -286,6 +285,36 @@ class COCO(PairedDataset):
                     val_samples.append(example)
                 elif split == 'test':
                     test_samples.append(example)
-
         return train_samples, val_samples, test_samples
 
+class MIMIC_CXR(PairedDataset):
+    def __init__(self, image_field, text_field, img_root, ann_root, id_root=None, use_restval=True,
+                 cut_validation=False):
+        ann = json.loads(open(os.path.join(ann_root, 'annotation.json'), 'r').read())
+
+        #with nostdout():
+        self.train_examples, self.val_examples, self.test_examples = self.get_samples(ann,img_root)
+        examples = self.train_examples + self.val_examples + self.test_examples
+        super(MIMIC_CXR, self).__init__(examples, {'image': image_field, 'text': text_field})
+
+    @property
+    def splits(self):
+        train_split = PairedDataset(self.train_examples, self.fields, is_train=True)
+        val_split = PairedDataset(self.val_examples, self.fields)
+        test_split = PairedDataset(self.test_examples, self.fields)
+        return train_split, val_split, test_split
+
+    @classmethod
+    def get_samples(cls, ann, img_root, ids_dataset=None):
+        train_samples = ann['train']
+        val_samples = ann['val']
+        test_samples = ann['test']
+
+        train_samples = [Example.fromdict({'image': os.path.join(img_root, e['image_path'][0]), 'text': e['report']})
+                         for e in train_samples]
+        val_samples = [Example.fromdict({'image': os.path.join(img_root, e['image_path'][0]), 'text': e['report']})
+                         for e in val_samples]
+        test_samples = [Example.fromdict({'image': os.path.join(img_root, e['image_path'][0]), 'text': e['report']})
+                         for e in test_samples]
+
+        return train_samples, val_samples, test_samples

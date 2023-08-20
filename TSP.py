@@ -46,13 +46,13 @@ if __name__ == '__main__':
     hyper_centers_dict = {}
     concept_features = np.load('./concept_features.npy')
     centers, labels = HClustering(concept_features, 2000)
-    hyper_centers_dict['hyper2k'] = torch.tensor(centers).float()
+    hyper_centers_dict['hyper2000'] = torch.tensor(centers).float()
     torch.save(hyper_centers_dict, './hyper_protos.pth')
 
 
     # 2000->800
 
-    centers  = torch.load('./hyper_protos.pth')['hyper2k']
+    centers  = torch.load('./hyper_protos.pth')['hyper2000']
     centers_2, labels_2 = HClustering(centers, 800)
 
     temp = torch.load('./hyper_protos.pth')

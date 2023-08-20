@@ -77,7 +77,6 @@ class TransformerDecoderLayer(Module):
         if self._is_stateful:
             self.running_seq.add_(1)
             seq = self.running_seq
-
         out = self.word_emb(input) + self.pos_emb(seq)
         for i, l in enumerate(self.layers):
             out = l(out, encoder_output, mask_queries, mask_self_attention, mask_encoder)
