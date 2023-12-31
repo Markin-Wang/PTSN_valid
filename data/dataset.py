@@ -354,9 +354,12 @@ class CXRGnome(PairedDataset):
 
         train_samples = [Example.fromdict({'image': train_table['image'][i], 'text': train_all_texts[i][0]})
                          for i in tqdm(range(len(train_all_texts)))]
+        train_table = None
         val_samples = [Example.fromdict({'image': val_table['image'][i], 'text': val_all_texts[i][0]})
                          for i in tqdm(range(len(val_all_texts)))]
+        val_table = None
         test_samples = [Example.fromdict({'image': test_table['image'][i], 'text': test_all_texts[i][0]})
                          for i in tqdm(range(len(test_all_texts)))]
+        test_table = None
 
         return train_samples, val_samples, test_samples
