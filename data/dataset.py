@@ -8,6 +8,7 @@ from .utils import nostdout
 from pycocotools.coco import COCO as pyCOCO
 import json
 import pyarrow as pa
+from tqdm import tqdm
 
 class Dataset(object):
     def __init__(self, examples, fields, is_train=False):
@@ -352,10 +353,10 @@ class CXRGnome(PairedDataset):
 
 
         train_samples = [Example.fromdict({'image': train_table['image'][i], 'text': train_all_texts[i][0]})
-                         for i in range(len(train_all_texts))]
+                         for i in tqdm(range(len(train_all_texts)))]
         val_samples = [Example.fromdict({'image': val_table['image'][i], 'text': val_all_texts[i][0]})
-                         for i in range(len(val_all_texts))]
+                         for i in tqdm(range(len(val_all_texts)))]
         test_samples = [Example.fromdict({'image': test_table['image'][i], 'text': test_all_texts[i][0]})
-                         for i in range(len(test_all_texts))]
+                         for i in tqdm(range(len(test_all_texts)))]
 
         return train_samples, val_samples, test_samples
