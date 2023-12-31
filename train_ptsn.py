@@ -358,17 +358,17 @@ def train(rank, worldSize, args):
             writer.add_scalar('data/val_meteor', scores['METEOR'], e)
             writer.add_scalar('data/val_rouge', scores['ROUGE'], e)
 
-        # Test scores
-        scores = evaluate_metrics(model, dict_dataloader_test, text_field, e, rank)
-        # print("Test scores", scores)
-        test_cider = scores['CIDEr']
-        if rank == 0:
-            print("Test scores", scores)
-            writer.add_scalar('data/test_cider', test_cider, e)
-            writer.add_scalar('data/test_bleu1', scores['BLEU'][0], e)
-            writer.add_scalar('data/test_bleu4', scores['BLEU'][3], e)
-            writer.add_scalar('data/test_meteor', scores['METEOR'], e)
-            writer.add_scalar('data/test_rouge', scores['ROUGE'], e)
+        # Test scores, too long for test in CXR-Gnome dataset
+        # scores = evaluate_metrics(model, dict_dataloader_test, text_field, e, rank)
+        # # print("Test scores", scores)
+        # test_cider = scores['CIDEr']
+        # if rank == 0:
+        #     print("Test scores", scores)
+        #     writer.add_scalar('data/test_cider', test_cider, e)
+        #     writer.add_scalar('data/test_bleu1', scores['BLEU'][0], e)
+        #     writer.add_scalar('data/test_bleu4', scores['BLEU'][3], e)
+        #     writer.add_scalar('data/test_meteor', scores['METEOR'], e)
+        #     writer.add_scalar('data/test_rouge', scores['ROUGE'], e)
 
         # Prepare for next epoch
         best = False
@@ -380,9 +380,9 @@ def train(rank, worldSize, args):
             patience += 1
 
         best_test = False
-        if test_cider >= best_test_cider:
-            best_test_cider = test_cider
-            best_test = True
+        # if test_cider >= best_test_cider:
+        #     best_test_cider = test_cider
+        #     best_test = True
 
         switch_to_rl = False
         exit_train = False
@@ -512,5 +512,5 @@ if __name__ == '__main__':
     worldSize = args.num_gpus
     _changeConfig(args, worldSize)
     print('\nDistribute config', args)
-    #train(0,1, args)
-    mp.spawn(train, (worldSize, args), worldSize)
+    train(0, 1, args)
+    #mp.spawn(train, (worldSize, args), worldSize)
