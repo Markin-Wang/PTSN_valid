@@ -1,4 +1,5 @@
 saved_models
+saved_transformer_models
 tensorboard_logs
 datasets
 resume_model

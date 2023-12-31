@@ -1,7 +1,7 @@
 import torch
 import random
 from data import TextField, RawField, ImageField
-from data import COCO, DataLoader, MIMIC_CXR
+from data import COCO, DataLoader, MIMIC_CXR, CXRGnome
 from torch.utils.data import DistributedSampler
 import evaluation
 from evaluation import PTBTokenizer, Cider
@@ -200,7 +200,7 @@ def train(rank, worldSize, args):
 
     # Create the dataset
     #dataset = COCO(image_field, text_field, 'coco/images/', args.annotation_folder, args.annotation_folder)
-    dataset = MIMIC_CXR(image_field, text_field, args.img_root_path, args.annotation_folder, args.annotation_folder)
+    dataset = CXRGnome(image_field, text_field, args.img_root_path, args.annotation_folder, args.annotation_folder)
     train_dataset, val_dataset, test_dataset = dataset.splits
 
     if not os.path.isfile('vocab.pkl'):

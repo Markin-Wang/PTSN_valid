@@ -7,6 +7,7 @@ from .example import Example
 from .utils import nostdout
 from pycocotools.coco import COCO as pyCOCO
 import json
+import pyarrow as pa
 
 class Dataset(object):
     def __init__(self, examples, fields, is_train=False):
@@ -316,5 +317,45 @@ class MIMIC_CXR(PairedDataset):
                          for e in val_samples]
         test_samples = [Example.fromdict({'image': os.path.join(img_root, e['image_path'][0]), 'text': e['report']})
                          for e in test_samples]
+
+        return train_samples, val_samples, test_samples
+
+class CXRGnome(PairedDataset):
+    def __init__(self, image_field, text_field, img_root, ann_root, id_root=None, use_restval=True,
+                 cut_validation=False):
+        #ann = json.loads(open(os.path.join(ann_root, 'annotation.json'), 'r').read())
+
+        #with nostdout():
+        self.train_examples, self.val_examples, self.test_examples = self.get_samples(img_root)
+        examples = self.train_examples + self.val_examples + self.test_examples
+        super(CXRGnome, self).__init__(examples, {'image': image_field, 'text': text_field})
+
+    @property
+    def splits(self):
+        train_split = PairedDataset(self.train_examples, self.fields, is_train=True)
+        val_split = PairedDataset(self.val_examples, self.fields)
+        test_split = PairedDataset(self.test_examples, self.fields)
+        return train_split, val_split, test_split
+
+    @classmethod
+    def get_samples(self,img_root, ids_dataset=None):
+        train_name = "cxr_gnome_train_ft_atsg"
+        val_name = "cxr_gnome_val_ft_sg"
+        test_name = "cxr_gnome_test_ft_sg"
+
+        train_table = pa.ipc.RecordBatchFileReader(pa.memory_map(f"{img_root}/{train_name}.arrow", "r")).read_all()
+        train_all_texts = train_table['caption'].to_pandas()
+        val_table = pa.ipc.RecordBatchFileReader(pa.memory_map(f"{img_root}/{val_name}.arrow", "r")).read_all()
+        val_all_texts = val_table['caption'].to_pandas()
+        test_table = pa.ipc.RecordBatchFileReader(pa.memory_map(f"{img_root}/{test_name}.arrow", "r")).read_all()
+        test_all_texts = test_table['caption'].to_pandas()
+
+
+        train_samples = [Example.fromdict({'image': train_table['image'][i], 'text': train_all_texts[i][0]})
+                         for i in range(len(train_all_texts))]
+        val_samples = [Example.fromdict({'image': val_table['image'][i], 'text': val_all_texts[i][0]})
+                         for i in range(len(val_all_texts))]
+        test_samples = [Example.fromdict({'image': test_table['image'][i], 'text': test_all_texts[i][0]})
+                         for i in range(len(test_all_texts))]
 
         return train_samples, val_samples, test_samples

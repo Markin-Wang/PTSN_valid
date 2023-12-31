@@ -28,7 +28,6 @@ if __name__ == '__main__':
             concept_feature = model.encode_text(text)
         concept_features.append(concept_feature.cpu())
     concept_features = torch.cat(concept_features,dim=0)
-    print(1111, concept_features.shape)
 
     torch.save({'clip_embeds':concept_features}, './word_embeds.pth' )
 

@@ -20,6 +20,8 @@ from .vocab import Vocab
 from .utils import get_tokenizer
 import pickle
 import lmdb
+import io
+
 class RawField(object):
     """ Defines a general datatype.
 
@@ -181,9 +183,15 @@ class ImageField(RawField):
 
     def preprocess(self, x, is_train):
         # image_id = int(x.split('_')[-1].split('.')[0])
-        image_path = self.config.img_root_path + x.split('images')[-1]
+        # image_path = self.config.img_root_path + x.split('images')[-1]
+        #
+        # img = Image.open(image_path).convert('RGB')
+        # cgnome load image from arrow file, so comment the above lines
+        image_bytes = io.BytesIO(x.as_py())
+        image_bytes.seek(0)
+        img = Image.open(image_bytes).convert("RGB")
 
-        img = Image.open(image_path).convert('RGB')
+
         if is_train:
             data = self.train_transform(img)
         else:
